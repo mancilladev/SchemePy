@@ -1,5 +1,6 @@
 import math
 import operator as op
+from functools import reduce
 
 Env = dict            # An environment is a mapping of {variable: value}
 Symbol = str          # A Scheme Symbol is implemented as a Python str
@@ -56,8 +57,11 @@ def standard_env():
     env = Env()
     env.update(vars(math)) # sin, cos, sqrt, pi, ...
     env.update({
-        '+':op.add, '-':op.sub, '*':op.mul, '/':op.truediv,
-        '>':op.gt, '<':op.lt, '>=':op.ge, '<=':op.le, '=':op.eq,
+        '+':lambda *x: reduce(op.add, x), '-':lambda *x: reduce(op.sub, x),
+        '*':lambda *x: reduce(op.mul, x), '/':lambda *x: reduce(op.truediv, x),
+        '>':lambda *x: reduce(op.gt, x), '<':lambda *x: reduce(op.lt, x),
+        '>=':lambda *x: reduce(op.ge, x), '<=':lambda *x: reduce(op.le, x),
+        '=':lambda *x: reduce(op.eq, x),
         'abs':      abs,
         'append':   op.add,
         'begin':    lambda *x: x[-1],
