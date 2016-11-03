@@ -1,6 +1,14 @@
+#!/usr/bin/env python
+import sys
 import math
+import readline
 import operator as op
 from functools import reduce
+
+
+readline.parse_and_bind('tab: complete')
+readline.parse_and_bind('set editing-mode vi')
+
 
 Env = dict            # An environment is a mapping of {variable: value}
 Symbol = str          # A Scheme Symbol is implemented as a Python str
@@ -61,7 +69,8 @@ def standard_env():
         '*':lambda *x: reduce(op.mul, x), '/':lambda *x: reduce(op.truediv, x),
         '>':lambda *x: reduce(op.gt, x), '<':lambda *x: reduce(op.lt, x),
         '>=':lambda *x: reduce(op.ge, x), '<=':lambda *x: reduce(op.le, x),
-        '=':lambda *x: reduce(op.eq, x),
+        '=':lambda *x: reduce(op.eq, x), 'and':lambda *x: reduce(lambda a,b: a and b, x),
+        'or':lambda *x: reduce(lambda a,b: a or b, x),
         'abs':      abs,
         'append':   op.add,
         'begin':    lambda *x: x[-1],
@@ -117,9 +126,12 @@ def eval(x, env=global_env):
 # -----------------------------------------------------------------------------
 def repl(prompt='~> '):
     while True:
-        val = eval(parse(input(prompt)))
-        if val is not None:
-            print(schemestr(val))
+        line = input(prompt)
+        if line == '': continue
+        else:
+            val = eval(parse(line))
+            if val is not None:
+                print(schemestr(val))
 
 
 def schemestr(exp):
@@ -129,9 +141,14 @@ def schemestr(exp):
         return str(exp)
 
 
-def main():
-    repl()
-
-
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) == 2:
+        with open(sys.argv[1], 'r') as fin:
+            val = eval(parse(fin.read()))
+            if val is not None:
+                print(schemestr(val))
+            exit()
+    try:
+        repl()
+    except EOFError:
+        print('Goodbye')
