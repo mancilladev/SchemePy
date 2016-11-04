@@ -10,7 +10,16 @@ readline.parse_and_bind('tab: complete')
 readline.parse_and_bind('set editing-mode vi')
 
 
-Env = dict            # An environment is a mapping of {variable: value}
+class Env(dict):
+    """Diccionario Python con Env exterior"""
+    def __init__(self, parms=(), args=(), outer=None):
+        self.update(zip(parms, args))
+        self.outer = outer
+    def find(self, var):
+        '''Buscar variable del Env más profundo al menos'''
+        return self if (var in self) else self.outer.find(var)
+
+
 Symbol = str          # A Scheme Symbol is implemented as a Python str
 List   = list         # A Scheme List is implemented as a Python list
 Number = (int, float) # A Scheme Number is implemented as a Python int or float
@@ -73,7 +82,6 @@ def standard_env():
         'or':lambda *x: reduce(lambda a,b: a or b, x),
         'abs':      abs,
         'append':   op.add,
-        'begin':    lambda *x: x[-1],
         'car':     lambda x: x[0],
         'cdr':     lambda x: x[1:], 
         'cons':    lambda x,y: [x] + y,
@@ -82,7 +90,7 @@ def standard_env():
         'length':  len, 
         'list':    lambda *x: list(x), 
         'list?':   lambda x: isinstance(x,list), 
-        'map':     map,
+        'map':     lambda f, l: list(map(f, l)),
         'max':     max,
         'min':     min,
         'not':     op.not_,
@@ -91,9 +99,19 @@ def standard_env():
         'procedure?': callable,
         'round':   round,
         'symbol?': lambda x: isinstance(x, Symbol),
+        'true': True,
+        'false': False,
     })
     return env
 
+
+class Procedure(object):
+    """Función creada por el usuario"""
+    def __init__(self, parms, body, env):
+        self.parms, self.body, self.env = parms, body, env
+    def __call__(self, *args):
+        return eval(self.body, Env(self.parms, args, self.env))
+        
 
 global_env = standard_env()
 
@@ -101,10 +119,14 @@ global_env = standard_env()
 def eval(x, env=global_env):
     # Variable reference
     if isinstance(x, Symbol):
-        return env[x]
-    # Constant
+        return env.find(x)[x]
+    # Constant literal
     elif not isinstance(x, List):
         return x
+    # Quotation
+    elif x[0] == 'quote':
+        _, exp = x
+        return exp
     # Conditional
     elif x[0] == 'if':
         _, test, conseq, alt = x
@@ -114,6 +136,17 @@ def eval(x, env=global_env):
     elif x[0] == 'define':
         _, var, exp = x
         env[var] = eval(exp, env)
+    # Variable or function assignment
+    elif x[0] == 'set!':
+        _, var, exp = x
+        env.find(var)[var] = eval(exp, env)
+    # Procedure creation
+    elif x[0] == 'lambda':
+        _, parms, body = x
+        return Procedure(parms, body, env)
+    # Begin program
+    elif x[0] == 'begin':
+        return '\n'.join(filter(lambda x: x != 'None', [str(eval(exp, env)) for exp in x[1:]]))
     # Procedure call
     else:
         procedure = eval(x[0], env)
@@ -124,7 +157,7 @@ def eval(x, env=global_env):
 # -----------------------------------------------------------------------------
 # REPL
 # -----------------------------------------------------------------------------
-def repl(prompt='~> '):
+def repl(prompt='scm> '):
     while True:
         line = input(prompt)
         if line == '': continue
@@ -141,14 +174,22 @@ def schemestr(exp):
         return str(exp)
 
 
-if __name__ == "__main__":
+def main():
     if len(sys.argv) == 2:
         with open(sys.argv[1], 'r') as fin:
             val = eval(parse(fin.read()))
             if val is not None:
                 print(schemestr(val))
             exit()
-    try:
-        repl()
-    except EOFError:
-        print('Goodbye')
+    else:
+        try:
+            repl()
+        except (KeyboardInterrupt, EOFError):
+            exit()
+        except Exception as e:
+            print(sys.exc_info()[0])
+            main()
+
+
+if __name__ == "__main__":
+    main()
